@@ -1,27 +1,16 @@
-# Byte-compiled / cache
 __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-
-# Packaging
 build/
 dist/
-
-# Virtual environments
 .venv/
 venv/
 env/
-
-# Secrets / local config
 .env
-
-# Coverage
 .coverage
 htmlcov/
-
-# Editor / tooling
 .vscode/
 .claude/settings.local.json
