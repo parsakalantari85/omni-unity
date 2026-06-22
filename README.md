@@ -2,7 +2,7 @@
 
 Omni is an interactive CLI that lets you automate Unity Editor workflows in plain English. It pairs the [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk-python) with the Unity MCP relay to give Claude live read/write access to your Unity project, while an explicit approval gate keeps you in control of every action.
 
----
+
 
 ## How it works
 
@@ -12,15 +12,12 @@ Omni is an interactive CLI that lets you automate Unity Editor workflows in plai
 4. Everything else pauses for your approval — you can approve, deny, edit the payload, or stop the task entirely.
 5. The relay translates approved calls into Unity Editor actions and returns results.
 
----
-
 ## Requirements
 
 - Python ≥ 3.10
 - Unity Editor with the [Unity MCP bridge](https://docs.unity3d.com/Packages/com.unity.ai.assistant@2.0/manual/unity-mcp-overview.html) installed and approved in **Project Settings ▸ AI ▸ Unity MCP**
 - The Unity MCP relay binary (`relay_linux`, `relay_mac_arm64`, `relay_mac_x64`, or `relay_win.exe`)
 
----
 
 ## Installation
 
@@ -29,8 +26,6 @@ cd Python/Package_project
 pip install -e .          # installs the `omni` console script
 pip install -e .[dev]     # also installs pytest for running tests
 ```
-
----
 
 ## Configuration
 
@@ -65,8 +60,6 @@ Save a project permanently so you don't need to pass `--project` every time:
 omni --set-project /path/to/MyGame
 ```
 
----
-
 ## Usage
 
 ```
@@ -87,7 +80,6 @@ export UNITY_RELAY_PATH=~/Downloads/RelayApp~
 omni --project ~/dev/MyGame
 ```
 
----
 
 ## Slash commands
 
@@ -105,8 +97,6 @@ Type any of these at the `›` prompt:
 | `/clear` | Clear the transcript pane (conversation is preserved) |
 | `/exit`, `/quit` | Leave Omni |
 
----
-
 ## Approval gate
 
 Whenever Claude wants to call a non-read-only tool, Omni shows a preview and waits:
@@ -121,8 +111,6 @@ Whenever Claude wants to call a non-read-only tool, Omni shows a preview and wai
 
 Read-only tools (`Read`, `Glob`, `Grep`, `TodoWrite`) are approved silently without a prompt.
 
----
-
 ## Debugging
 
 Set `OMNI_DEBUG=1` to print a full Python traceback on fatal errors instead of the terse one-liner:
@@ -130,8 +118,6 @@ Set `OMNI_DEBUG=1` to print a full Python traceback on fatal errors instead of t
 ```bash
 OMNI_DEBUG=1 omni --project ~/dev/MyGame
 ```
-
----
 
 ## Project structure
 
@@ -149,8 +135,6 @@ tests/
 └── test_Package.py             # unit tests (config, discovery, approval gate, UI helpers)
 ```
 
----
-
 ## Running tests
 
 ```bash
@@ -161,7 +145,6 @@ pytest
 
 Tests cover the config store, project/relay discovery, relay-state mapping, UI name parsing, and the full approval-gate state machine. Live Unity Editor integration is out of scope for unit tests.
 
----
 
 ## License
 
