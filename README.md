@@ -7,9 +7,9 @@ Omni is an interactive CLI that lets you automate Unity Editor workflows in plai
 ## How it works
 
 ```
-omni CLI  ──►  Claude (claude-agent-sdk)  ──►  Unity MCP relay  ──►  Unity Editor
-   ▲                                                                        │
-   └────────────── approval gate (you decide per tool call) ───────────────┘
+Agents CLI  ──►  Claude (claude-agent-sdk)  ──►  Unity MCP relay  ──►  Unity Editor
+    ▲                                                                       │
+    └────────────── approval gate (you decide per tool call) ───────────────┘
 ```
 
 1. You type a task (e.g. "Enable HDR on the Main Camera and set bloom intensity to 0.8").
@@ -17,6 +17,8 @@ omni CLI  ──►  Claude (claude-agent-sdk)  ──►  Unity MCP relay  ─�
 3. Read-only tools (`Read`, `Glob`, `Grep`) are approved automatically.
 4. Everything else pauses for your approval — you can approve, deny, edit the payload, or stop the task entirely.
 5. The relay translates approved calls into Unity Editor actions and returns results.
+
+![Omni terminal UI running a task](docs/images/omni-ui.png)
 
 ---
 
@@ -68,6 +70,8 @@ Save a project permanently so you don't need to pass `--project` every time:
 ```bash
 omni --set-project /path/to/MyGame
 ```
+
+![Unity Project Settings — AI › Unity MCP approval screen](docs/images/unity-mcp-settings.png)
 
 ---
 
@@ -125,6 +129,8 @@ Whenever Claude wants to call a non-read-only tool, Omni shows a preview and wai
 
 Read-only tools (`Read`, `Glob`, `Grep`, `TodoWrite`) are approved silently without a prompt.
 
+![Approval gate prompt showing a Bash tool call awaiting review](docs/images/omni-approval-gate.png)
+
 ---
 
 ## Debugging
@@ -170,3 +176,7 @@ Tests cover the config store, project/relay discovery, relay-state mapping, UI n
 ## License
 
 See [LICENSE](LICENSE).
+
+---
+
+*I made this agent in collaboration with [Claude Code](https://claude.ai/code).*
