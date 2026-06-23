@@ -7,6 +7,7 @@ Omni is an interactive CLI that lets you automate Unity Editor workflows in plai
 
 ## How it works
 
+Like any agent, Omni works in a loop. Here's a Unity example:
 1. You type a task (e.g. "Enable HDR on the Main Camera and set bloom intensity to 0.8").
 2. Claude plans the steps and issues tool calls.
 3. Read-only tools (`Read`, `Glob`, `Grep`) are approved automatically.
@@ -16,6 +17,7 @@ Omni is an interactive CLI that lets you automate Unity Editor workflows in plai
 ## Requirements
 
 - Python ≥ 3.10
+- Claude Code (CLI or Desktop)
 - Unity Editor with the [Unity MCP bridge](https://docs.unity3d.com/Packages/com.unity.ai.assistant@2.0/manual/unity-mcp-overview.html) installed and approved in **Project Settings ▸ AI ▸ Unity MCP**
 - The Unity MCP relay binary (`relay_linux`, `relay_mac_arm64`, `relay_mac_x64`, or `relay_win.exe`)
 
@@ -24,7 +26,7 @@ Omni is an interactive CLI that lets you automate Unity Editor workflows in plai
 ```bash
 cd Python/Package_project
 pip install -e .          # installs the `omni` console script
-pip install -e .[dev]     # also installs pytest for running tests
+# pytest installation guide at the very end of this README.
 ```
 
 ## Configuration
@@ -116,26 +118,11 @@ Set `OMNI_DEBUG=1` to print a full Python traceback on fatal errors instead of t
 OMNI_DEBUG=1 omni --project ~/dev/MyGame
 ```
 
-## Project structure
-
-```
-Python/Package_project/
-├── pyproject.toml              # package metadata, console script entry point
-├── dev-requirements.txt        # development dependencies (pytest, …)
-└── project_omni/
-    ├── __init__.py
-    ├── __main__.py             # python -m project_omni entry point
-    ├── agent.py                # REPL loop, approval gate, slash commands, SDK wiring
-    ├── config.py               # ~/.omni/config.json read/write helpers
-    └── ui.py                   # full-screen prompt_toolkit + rich terminal UI
-tests/
-└── test_Package.py             # unit tests (config, discovery, approval gate, UI helpers)
-```
-
 ## Running tests
 
+From the same Python/Package_project folder, run:
+
 ```bash
-cd Python/Package_project
 pip install -e .[dev]
 pytest
 ```
