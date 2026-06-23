@@ -36,8 +36,10 @@ pip install -e .          # installs the `omni` console script
 Point Omni at the relay binary (or the directory that contains platform binaries):
 
 ```bash
-export UNITY_RELAY_PATH=/path/to/RelayApp~          # directory form
-# or
+export UNITY_RELAY_PATH=/path/to/RelayApp~               # directory form
+```
+or
+```bash
 export UNITY_RELAY_PATH=/path/to/RelayApp~/relay_linux   # file form
 ```
 
