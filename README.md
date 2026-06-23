@@ -2,7 +2,7 @@
 
 Omni is an interactive CLI that lets you automate Unity Editor workflows in plain English. It pairs the [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk) with the Unity MCP relay to give Claude live read/write access to your Unity project, while an explicit approval gate keeps you in control of every action.
 
-![Omni terminal UI running a task](docs/images/omni-ui.png)
+![Omni terminal UI running a task](./img/Screenshot%202026-06-23%20125057.png)
 
 ## How it works
 
