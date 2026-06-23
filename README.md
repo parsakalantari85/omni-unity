@@ -15,7 +15,7 @@ Omni is an interactive CLI that lets you automate Unity Editor workflows in plai
 ## Requirements
 
 - Python ≥ 3.10
-- Unity Editor with the [Unity MCP bridge](https://docs.unity3d.com/Manual/ai-unity-mcp.html) installed and approved in **Project Settings ▸ AI ▸ Unity MCP**
+- Unity Editor with the [Unity MCP bridge](https://docs.unity3d.com/Packages/com.unity.ai.assistant@2.0/manual/unity-mcp-overview.html) installed and approved in **Project Settings ▸ AI ▸ Unity MCP**
 - The Unity MCP relay binary (`relay_linux`, `relay_mac_arm64`, `relay_mac_x64`, or `relay_win.exe`)
 
 ## Installation
