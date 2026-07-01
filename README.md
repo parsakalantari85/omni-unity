@@ -1,6 +1,7 @@
+**Note:** Recent preview releases of Unity MCP have introduced connection and approval regressions that are outside this project's control. Documentation and project will be expanded once the Unity MCP server stabilizes.
+-----
 # Omni — Unity Editor Automation Agent
 [![CI](https://github.com/parsakalantari85/omni-unity/actions/workflows/ci.yml/badge.svg)](https://github.com/parsakalantari85/omni-unity/actions/workflows/ci.yml)
-**Note:** Recent preview releases of Unity MCP have introduced connection and approval regressions that are outside this project's control. Documentation and project will be expanded once the Unity MCP server stabilizes.
 
 Omni is an interactive CLI that lets you automate Unity Editor workflows in plain English. It pairs the [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk-python) with the Unity MCP relay to give Claude live read/write access to your Unity project, while an explicit approval gate keeps you in control of every action.
 
