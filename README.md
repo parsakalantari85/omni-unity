@@ -27,7 +27,7 @@ Like any agent, Omni works in a loop. Here's a Unity example:
 ## Installation
 
 ```bash
-cd Python/Package_project
+cd Package_project
 pip install -e .          # installs the `omni` console script
 # pytest installation guide at the very end of this README.
 ```
@@ -125,7 +125,7 @@ OMNI_DEBUG=1 omni --project ~/dev/MyGame
 
 ## Running tests
 
-From the same Python/Package_project folder, run:
+From the same Package_project folder, run:
 
 ```bash
 pip install -e .[dev]
