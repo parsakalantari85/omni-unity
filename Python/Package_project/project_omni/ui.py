@@ -36,6 +36,10 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.text import Text
 
+from . import log
+
+_logger = log.get("ui")
+
 # Product name shown in the UI (frame title, command help). One source so the
 # agent and UI can't display different names.
 APP_NAME = "Omni"
@@ -239,6 +243,7 @@ async def _run_interrupt() -> None:
         if _interrupt_handler is not None:
             await _interrupt_handler()
     except Exception as exc:
+        _logger.exception("interrupt failed")
         error(f"(interrupt failed: {exc})")
 
 
