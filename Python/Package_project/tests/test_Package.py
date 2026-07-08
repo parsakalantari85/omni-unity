@@ -14,11 +14,18 @@ import json
 import pytest
 
 from project_omni import agent, config, ui
+from claude_agent_sdk import UserMessage
 from claude_agent_sdk.types import (
     PermissionResultAllow,
     PermissionResultDeny,
     ToolPermissionContext,
 )
+
+
+def make_unity(path):
+    """Give a directory the minimal shape is_unity_project accepts."""
+    (path / "Assets").mkdir(parents=True, exist_ok=True)
+    return path
 
 
 # config store
@@ -85,25 +92,43 @@ def test_is_unity_project_false_for_plain_dir(tmp_path):
     assert not agent.is_unity_project(tmp_path)
 
 
+def test_is_unity_project_ignores_file_named_assets(tmp_path):
+    # Assets must be a directory; a stray file with that name doesn't count.
+    (tmp_path / "Assets").write_text("", encoding="utf-8")
+    assert not agent.is_unity_project(tmp_path)
+
+
 # find_project: priority order
 
 def test_find_project_prefers_override(tmp_path, monkeypatch):
     monkeypatch.delenv("UNITY_PROJECT_PATH", raising=False)
     monkeypatch.setattr(config, "get", lambda *a, **k: None)
-    result = agent.find_project(str(tmp_path))
+    result = agent.find_project(str(make_unity(tmp_path)))
     assert result == tmp_path.resolve()
 
 
 def test_find_project_falls_back_to_saved_config(tmp_path, monkeypatch):
     monkeypatch.delenv("UNITY_PROJECT_PATH", raising=False)
-    monkeypatch.setattr(config, "get", lambda *a, **k: str(tmp_path))
+    monkeypatch.setattr(config, "get", lambda *a, **k: str(make_unity(tmp_path)))
     assert agent.find_project(None) == tmp_path.resolve()
 
 
 def test_find_project_falls_back_to_env(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "get", lambda *a, **k: None)
-    monkeypatch.setenv("UNITY_PROJECT_PATH", str(tmp_path))
+    monkeypatch.setenv("UNITY_PROJECT_PATH", str(make_unity(tmp_path)))
     assert agent.find_project(None) == tmp_path.resolve()
+
+
+def test_find_project_skips_non_unity_dirs(tmp_path, monkeypatch):
+    # A directory that exists but isn't a Unity project must not win over a
+    # later source that is.
+    monkeypatch.delenv("UNITY_RELAY_PATH", raising=False)
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    unity = make_unity(tmp_path / "unity")
+    monkeypatch.setattr(config, "get", lambda *a, **k: None)
+    monkeypatch.setenv("UNITY_PROJECT_PATH", str(unity))
+    assert agent.find_project(str(plain)) == unity.resolve()
 
 
 def test_find_project_ignores_nonexistent_paths(monkeypatch):
@@ -171,6 +196,12 @@ def test_relay_state_no_unity_server():
     assert agent.relay_state(servers) == ui.STATE_NO_RELAY
 
 
+def test_relay_state_tolerates_malformed_entries():
+    # Entries missing name/status must not raise.
+    servers = [{}, {"name": "unity"}]
+    assert agent.relay_state(servers) == ui.STATE_DISCONNECTED
+
+
 # _tool_names
 
 def test_tool_names_handles_dicts_and_strings():
@@ -199,6 +230,12 @@ class FakeContext(ToolPermissionContext):
     def __init__(self, title="do the thing"):
         self.title = title
         self.suggestions = []
+
+
+@pytest.fixture
+def gate(tmp_path):
+    """Approval gate scoped to tmp_path as its only allowed root."""
+    return agent.make_approval_gate([tmp_path])
 
 
 @pytest.fixture
@@ -236,84 +273,137 @@ def run(coro):
     return asyncio.run(coro)
 
 
-def test_gate_auto_approves_read_only_tools(stub_ui):
-    result = run(agent.approval_gate("Read", {"file_path": "x"}, FakeContext()))
+def test_gate_auto_approves_in_root_read(gate, tmp_path, stub_ui):
+    inside = tmp_path / "Assets" / "scene.unity"
+    result = run(gate("Read", {"file_path": str(inside)}, FakeContext()))
     assert isinstance(result, PermissionResultAllow)
     # Auto-approved tools never reach the prompt.
     assert stub_ui["shown"] == []
 
 
-def test_gate_approve_choice(stub_ui):
+def test_gate_prompts_for_out_of_root_read(gate, tmp_path, stub_ui):
     stub_ui["choices"] = ["a"]
-    result = run(agent.approval_gate("Write", {"file_path": "x"}, FakeContext()))
+    outside = tmp_path.parent / "elsewhere" / "secrets.txt"
+    result = run(gate("Read", {"file_path": str(outside)}, FakeContext()))
+    assert isinstance(result, PermissionResultAllow)
+    # Out-of-root reads must go through the approval prompt.
+    assert stub_ui["shown"] != []
+
+
+def test_gate_prompts_for_dotdot_escape(gate, tmp_path, stub_ui):
+    stub_ui["choices"] = ["d"]
+    stub_ui["lines"] = [""]
+    sneaky = tmp_path / ".." / ".." / "secrets.txt"
+    result = run(gate("Read", {"file_path": str(sneaky)}, FakeContext()))
+    assert isinstance(result, PermissionResultDeny)
+    assert stub_ui["shown"] != []
+
+
+def test_gate_auto_approves_pathless_glob(gate, stub_ui):
+    # No path -> the tool defaults to cwd (the project root).
+    result = run(gate("Glob", {"pattern": "**/*.cs"}, FakeContext()))
+    assert isinstance(result, PermissionResultAllow)
+    assert stub_ui["shown"] == []
+
+
+def test_gate_auto_approves_todowrite(gate, stub_ui):
+    result = run(gate("TodoWrite", {"todos": []}, FakeContext()))
+    assert isinstance(result, PermissionResultAllow)
+    assert stub_ui["shown"] == []
+
+
+def test_gate_approve_choice(gate, stub_ui):
+    stub_ui["choices"] = ["a"]
+    result = run(gate("Write", {"file_path": "x"}, FakeContext()))
     assert isinstance(result, PermissionResultAllow)
 
 
-def test_gate_deny_with_reason(stub_ui):
+def test_gate_deny_with_reason(gate, stub_ui):
     stub_ui["choices"] = ["d"]
     stub_ui["lines"] = ["touches ProjectSettings"]
-    result = run(agent.approval_gate("Bash", {"command": "rm -rf /"}, FakeContext()))
+    result = run(gate("Bash", {"command": "rm -rf /"}, FakeContext()))
     assert isinstance(result, PermissionResultDeny)
     assert result.message == "touches ProjectSettings"
 
 
-def test_gate_deny_empty_reason_gets_default(stub_ui):
+def test_gate_deny_empty_reason_gets_default(gate, stub_ui):
     stub_ui["choices"] = ["d"]
     stub_ui["lines"] = ["   "]
-    result = run(agent.approval_gate("Bash", {"command": "ls"}, FakeContext()))
+    result = run(gate("Bash", {"command": "ls"}, FakeContext()))
     assert isinstance(result, PermissionResultDeny)
     assert result.message == "User denied this action."
 
 
-def test_gate_quit_denies_and_interrupts(stub_ui):
+def test_gate_quit_denies_and_interrupts(gate, stub_ui):
     stub_ui["choices"] = ["q"]
-    result = run(agent.approval_gate("Write", {}, FakeContext()))
+    result = run(gate("Write", {}, FakeContext()))
     assert isinstance(result, PermissionResultDeny)
     assert result.interrupt is True
 
 
-def test_gate_edit_replaces_input(stub_ui):
+def test_gate_edit_replaces_input(gate, stub_ui):
     stub_ui["choices"] = ["e"]
     stub_ui["lines"] = ['{"file_path": "safe.txt", "content": "hi"}']
-    result = run(agent.approval_gate("Write", {"file_path": "x"}, FakeContext()))
+    result = run(gate("Write", {"file_path": "x"}, FakeContext()))
     assert isinstance(result, PermissionResultAllow)
     assert result.updated_input == {"file_path": "safe.txt", "content": "hi"}
 
 
-def test_gate_edit_rejects_invalid_json_then_recovers(stub_ui):
+def test_gate_edit_rejects_invalid_json_then_recovers(gate, stub_ui):
     # First reply is malformed JSON -> error + reprompt; then approve.
     stub_ui["choices"] = ["e", "a"]
     stub_ui["lines"] = ["{not json"]
-    result = run(agent.approval_gate("Write", {}, FakeContext()))
+    result = run(gate("Write", {}, FakeContext()))
     assert isinstance(result, PermissionResultAllow)
     assert "error" in stub_ui["shown"]
 
 
-def test_gate_edit_rejects_non_object_json(stub_ui):
+def test_gate_edit_rejects_non_object_json(gate, stub_ui):
     # A JSON array is valid JSON but not a tool-input object -> reprompt.
     stub_ui["choices"] = ["e", "d"]
     stub_ui["lines"] = ["[1, 2, 3]", "no"]
-    result = run(agent.approval_gate("Write", {}, FakeContext()))
+    result = run(gate("Write", {}, FakeContext()))
     assert isinstance(result, PermissionResultDeny)
     assert "error" in stub_ui["shown"]
 
 
-def test_gate_unknown_choice_reprompts(stub_ui):
+def test_gate_unknown_choice_reprompts(gate, stub_ui):
     stub_ui["choices"] = ["x", "a"]
-    result = run(agent.approval_gate("Write", {}, FakeContext()))
+    result = run(gate("Write", {}, FakeContext()))
     assert isinstance(result, PermissionResultAllow)
     assert "error" in stub_ui["shown"]
 
 
-def test_gate_eof_on_choice_denies(stub_ui):
+def test_gate_eof_on_choice_denies(gate, stub_ui):
     stub_ui["choices"] = [EOFError()]
-    result = run(agent.approval_gate("Write", {}, FakeContext()))
+    result = run(gate("Write", {}, FakeContext()))
     assert isinstance(result, PermissionResultDeny)
 
 
-def test_gate_full_payload_then_approve(stub_ui):
+def test_gate_full_payload_then_approve(gate, stub_ui):
     # [f] shows the full payload and loops back for another choice.
     stub_ui["choices"] = ["f", "a"]
-    result = run(agent.approval_gate("Write", {"file_path": "x"}, FakeContext()))
+    result = run(gate("Write", {"file_path": "x"}, FakeContext()))
     assert isinstance(result, PermissionResultAllow)
     assert "full" in stub_ui["shown"]
+
+
+# _is_prompt_replay (rewind checkpoints)
+
+def test_prompt_replay_accepts_plain_prompt():
+    msg = UserMessage(content="set HDR on", uuid="abc-123")
+    assert agent._is_prompt_replay(msg)
+
+
+def test_prompt_replay_rejects_missing_uuid():
+    assert not agent._is_prompt_replay(UserMessage(content="hi"))
+
+
+def test_prompt_replay_rejects_tool_results():
+    msg = UserMessage(content="x", uuid="abc", tool_use_result={"ok": True})
+    assert not agent._is_prompt_replay(msg)
+
+
+def test_prompt_replay_rejects_subagent_messages():
+    msg = UserMessage(content="x", uuid="abc", parent_tool_use_id="tu_1")
+    assert not agent._is_prompt_replay(msg)
