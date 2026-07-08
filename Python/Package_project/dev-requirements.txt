@@ -1,4 +1,2 @@
-pytest
-setuptools
-wheel
-# TODO: update the necessary requirements to develop this package
+pytest>=8
+pyright>=1.1
