@@ -20,8 +20,7 @@ def get(key: str, default=None):
 
 
 def set(key: str, value) -> None:
-    # Silent on purpose: callers report success. A bare print() here would
-    # corrupt the full-screen prompt_toolkit UI when invoked mid-session.
+    # Silent on purpose: a print() here would corrupt the full-screen UI.
     _CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     data = _load()
     data[key] = value
@@ -29,5 +28,5 @@ def set(key: str, value) -> None:
 
 
 def path() -> Path:
-    """Location of the config file (for callers that report where they saved)."""
+    """Location of the config file."""
     return _CONFIG_FILE

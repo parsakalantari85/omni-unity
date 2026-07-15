@@ -29,10 +29,8 @@ from . import config, log, ui
 
 logger = log.get()
 
-# Read-only tools we approve without prompting — but only for paths inside the
-# allowed roots (project + --add-dir). Reads elsewhere hit the prompt.
+# Auto-approved read-only tools — only for paths inside the allowed roots.
 AUTO_APPROVE_READONLY = {"Read", "Glob", "Grep"}
-# Tools with no filesystem surface at all.
 AUTO_APPROVE_ALWAYS = {"TodoWrite"}
 
 
@@ -52,11 +50,7 @@ def make_approval_gate(roots: Iterable[Path]):
     async def approval_gate(
         tool_name: str, input_data: dict[str, Any], context: ToolPermissionContext
     ) -> PermissionResultAllow | PermissionResultDeny:
-        """Permission prompt for any tool call that isn't already allowed.
-
-        Tools permitted elsewhere (permission_mode, settings rules) never
-        reach this callback.
-        """
+        """Prompt the user for any tool call not already allowed elsewhere."""
         if tool_name in AUTO_APPROVE_ALWAYS:
             return PermissionResultAllow()
         if tool_name in AUTO_APPROVE_READONLY and _in_roots(
@@ -119,18 +113,13 @@ def make_approval_gate(roots: Iterable[Path]):
 def find_project(override: str | None = None) -> Path | None:
     """Locate the Unity project root.
 
-    Priority:
-      1. --project CLI arg
-      2. ~/.omni/config.json  (written by --set-project)
-      3. UNITY_PROJECT_PATH env var
-      4. Walk up from UNITY_RELAY_PATH until a ProjectSettings/ folder is found
+    Priority: --project arg, saved config, UNITY_PROJECT_PATH, then walking
+    up from UNITY_RELAY_PATH to a ProjectSettings/ folder.
     """
     for raw in (override, config.get("project"), os.environ.get("UNITY_PROJECT_PATH")):
         if raw:
             p = Path(raw)
-            # Same bar as --set-project: a directory that also looks like a
-            # Unity project. Skipping non-matches falls through to the next
-            # source rather than handing the agent an arbitrary directory.
+            # Non-matches fall through to the next source.
             if p.is_dir() and is_unity_project(p):
                 return p.resolve()
 
@@ -145,7 +134,6 @@ def find_project(override: str | None = None) -> Path | None:
 
 
 def is_unity_project(path: Path) -> bool:
-    """True when `path` has an Assets/ directory, a .csproj, or Assembly-CSharp*."""
     return (
         (path / "Assets").is_dir()
         or any(path.glob("*.csproj"))
@@ -156,15 +144,13 @@ def is_unity_project(path: Path) -> bool:
 def find_relay() -> str | None:
     """Path to the Unity MCP relay binary, or None when it isn't available.
 
-    UNITY_RELAY_PATH may point either directly to the binary or to the
-    RelayApp~ directory that contains platform-specific binaries.
+    UNITY_RELAY_PATH may be the binary itself or a directory of platform builds.
     """
     relay = os.environ.get("UNITY_RELAY_PATH")
     if not relay:
         return None
     if os.path.isfile(relay):
         return relay
-    # Directory case: pick the right binary for the current platform.
     if sys.platform == "win32":
         candidate = os.path.join(relay, "relay_win.exe")
     elif sys.platform == "darwin":
@@ -195,8 +181,6 @@ def build_options(
     add_dirs: list[str | Path] | None = None,
     max_turns: int | None = None,
 ) -> ClaudeAgentOptions:
-    # No relay is not fatal: the REPL still starts and the header explains how
-    # to connect.
     mcp_servers: dict[str, Any] = {}
     if relay:
         mcp_servers["unity"] = {
@@ -206,8 +190,8 @@ def build_options(
         }
 
     return ClaudeAgentOptions(
-        # preset+append keeps Claude Code's default system prompt and adds our
-        # domain instructions on top; a plain string would replace it entirely.
+        # preset+append keeps the default system prompt; a plain string would
+        # replace it.
         system_prompt={
             "type": "preset",
             "preset": "claude_code",
@@ -222,29 +206,23 @@ def build_options(
         },
         mcp_servers=mcp_servers,
         cwd=project,
-        # Extra roots the agent may read/write beyond the project cwd.
         add_dirs=add_dirs or [],
-        # Pinned so host settings can't silently widen permissions under the gate.
+        # Pinned so host settings can't widen permissions under the gate.
         permission_mode="default",
         can_use_tool=make_approval_gate(
             [Path(p) for p in [project, *(add_dirs or [])] if p]
         ),
-        # Track file changes so /rewind can restore them if an approved action
-        # goes wrong. replay-user-messages makes UserMessages (with uuid) flow
-        # back through the stream; those uuids are the rewind checkpoints.
+        # Checkpointing + replayed UserMessage uuids are what /rewind uses.
         enable_file_checkpointing=True,
         extra_args={"replay-user-messages": None},
         max_turns=max_turns,
     )
 
-# Slash command handlers run locally instead of going to the model. Signature
-# is (client, relay, arg) -> None; register new ones in COMMANDS below.
+# Slash command handlers: (client, relay, arg) -> None; registered in COMMANDS.
 
-# Accepted values for /mode, taken from the SDK so the list can't drift.
+# /mode values, taken from the SDK so the list can't drift.
 _PERMISSION_MODES: tuple[str, ...] = get_args(PermissionMode)
-# Modes that widen access beyond the approval gate. "dontAsk" is not here on
-# purpose: it denies anything not pre-approved. "auto" is undocumented in the
-# SDK, so treat it as widening until proven otherwise.
+# Modes that widen access beyond the approval gate.
 _GATE_BYPASSING_MODES = {"bypassPermissions", "auto"}
 
 
@@ -258,8 +236,7 @@ async def cmd_reconnect(client: ClaudeSDKClient, relay: str | None, arg: str) ->
         try:
             ui.note(f"Reconnecting… (attempt {attempt}/3)")
             await client.reconnect_mcp_server("unity")
-            # Give the relay subprocess a moment to finish its handshake with
-            # Unity before we read status.
+            # Let the relay finish its handshake before reading status.
             await asyncio.sleep(1.0)
             status = await client.get_mcp_status()
             ui.relay_update(relay_state(status["mcpServers"]))
@@ -271,7 +248,6 @@ async def cmd_reconnect(client: ClaudeSDKClient, relay: str | None, arg: str) ->
                 await asyncio.sleep(1.5 * attempt)
     logger.error("reconnect failed after 3 attempts", exc_info=last_exc)
     ui.error(f"(reconnect failed: {last_exc})")
-    # A flat reconnect failure means we never (re-)connected.
     ui.relay_update(ui.STATE_DISCONNECTED)
 
 
@@ -340,11 +316,7 @@ async def cmd_model(client: ClaudeSDKClient, relay: str | None, arg: str) -> Non
 
 
 async def cmd_mode(client: ClaudeSDKClient, relay: str | None, arg: str) -> None:
-    """Change the permission mode, e.g. `/mode acceptEdits`.
-
-    build_options pins this to "default" so host settings can't silently widen
-    the approval gate; this command lets *you* change it deliberately.
-    """
+    """Change the permission mode, e.g. `/mode acceptEdits`."""
     mode = arg.strip()
     if not mode:
         ui.error("Usage: /mode <" + " | ".join(_PERMISSION_MODES) + ">.")
@@ -365,8 +337,6 @@ async def cmd_mode(client: ClaudeSDKClient, relay: str | None, arg: str) -> None
             ui.note("Mode unchanged.")
             return
     try:
-        # Membership in _PERMISSION_MODES is checked above; the cast just
-        # tells the type checker mode is a valid PermissionMode literal.
         await client.set_permission_mode(cast(PermissionMode, mode))
     except Exception as exc:
         logger.exception("set_permission_mode(%r) failed", mode)
@@ -399,7 +369,6 @@ async def cmd_help(client: ClaudeSDKClient, relay: str | None, arg: str) -> None
     ui.command_help(COMMANDS_HELP)
 
 
-# name (without leading slash) -> handler.
 COMMANDS: dict[str, Any] = {
     "help": cmd_help,
     "test": cmd_test,
@@ -412,7 +381,7 @@ COMMANDS: dict[str, Any] = {
     "restart": cmd_reconnect,  # alias for reconnect
 }
 
-# (label, description) rows shown by /help; keep in sync with COMMANDS.
+# Keep in sync with COMMANDS.
 COMMANDS_HELP = [
     ("/help", "list these commands"),
     ("/test", "probe the Unity MCP connection"),
@@ -433,11 +402,7 @@ _checkpoints: list[str] = []
 
 
 def _is_prompt_replay(message: UserMessage) -> bool:
-    """True for a replayed user *prompt* (usable as a rewind checkpoint).
-
-    Tool results also arrive as UserMessages; those don't mark a state we
-    would want to rewind to.
-    """
+    """True for a replayed user prompt; tool results also arrive as UserMessages."""
     if not message.uuid or message.parent_tool_use_id or message.tool_use_result:
         return False
     if isinstance(message.content, str):
@@ -449,8 +414,6 @@ async def drain(client: ClaudeSDKClient) -> None:
     """Print one full response (until ResultMessage)."""
     async for message in client.receive_response():
         if isinstance(message, UserMessage):
-            # The explicit uuid check (redundant with _is_prompt_replay) is
-            # what narrows str | None to str for the type checker.
             if message.uuid and _is_prompt_replay(message):
                 _checkpoints.append(message.uuid)
         elif isinstance(message, AssistantMessage):
@@ -468,12 +431,10 @@ async def drain(client: ClaudeSDKClient) -> None:
 
 
 async def prompt_unity_access() -> Path | None:
-    """Offer to make the current directory omni's saved Unity project.
+    """Offer to save the cwd as omni's Unity project.
 
-    Called only when no project was configured by other means. The cwd must
-    look like a Unity project; answering yes saves it to ~/.omni/config.json so
-    future launches skip this prompt. No (or ctrl-d) exits — the SDK would
-    otherwise fall back to the process cwd, granting access nothing consented to.
+    Declining exits — the SDK would otherwise fall back to the process cwd,
+    granting access nothing consented to.
     """
     cwd = Path.cwd()
     if not is_unity_project(cwd):
@@ -492,7 +453,7 @@ async def prompt_unity_access() -> Path | None:
         return None
 
     resolved = cwd.resolve()
-    config.set("project", str(resolved))  # persist for next launch
+    config.set("project", str(resolved))
     ui.note(f"Saved — omni will reuse this project ({config.path()}).")
     return resolved
 
@@ -506,8 +467,6 @@ async def main(
     if project is None:
         project = await prompt_unity_access()
         if project is None:
-            # No project means no session: cwd=None would silently default to
-            # the process cwd, making the declined grant meaningless.
             return
     options = build_options(relay, project, add_dirs, max_turns)
     logger.info("session start: project=%s relay=%s", project, relay)
@@ -538,8 +497,6 @@ async def main(
 
             if prompt.lower().split(maxsplit=1)[0] in {"/exit", "/quit"}:
                 break
-            # Slash commands run locally; first word is the command, the rest
-            # its argument. Bare words go to the model.
             if prompt.startswith("/"):
                 name, _, arg = prompt.partition(" ")
                 handler = COMMANDS.get(name.lower().lstrip("/"))
@@ -620,9 +577,7 @@ def run() -> None:
         print(f"Saved project root: {p}  ({config.path()})")
         return
 
-    # An explicit --project that doesn't hold up is a hard error: falling
-    # through to the saved config would silently run against a different
-    # project than the one the user named.
+    # A bad --project is a hard error, not a fallthrough to the saved config.
     if args.project:
         p = Path(args.project)
         if not p.is_dir():
@@ -647,7 +602,7 @@ def run() -> None:
     except KeyboardInterrupt:
         pass
     except Exception as exc:
-        # The UI is torn down by now, so plain print is safe again.
+        # The UI is torn down by now; plain print is safe.
         logger.exception("fatal error")
         print(f"fatal: {exc}  (traceback in {log_file})")
         sys.exit(1)

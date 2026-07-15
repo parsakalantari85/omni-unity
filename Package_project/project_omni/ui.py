@@ -1,13 +1,9 @@
 """Terminal UI for the Unity automation agent.
 
-A single full-screen ``prompt_toolkit`` application: model output and tool
-activity scroll inside the bordered pane up top, while the input box stays
-pinned at the bottom. Because the app owns the screen, typed commands and
-approval keypresses leave no scrollback residue.
-
-Presentation only. ``agent.py`` owns all control flow and permission
-decisions; it calls into here for every line of input and output. ``rich``
-renders each message to ANSI, which we splice into the output pane.
+A single full-screen ``prompt_toolkit`` app: output scrolls in the bordered
+pane, the input box stays pinned at the bottom. Presentation only —
+``agent.py`` owns control flow; ``rich`` renders each message to ANSI,
+which we splice into the output pane.
 """
 from __future__ import annotations
 
@@ -40,8 +36,6 @@ from . import log
 
 _logger = log.get("ui")
 
-# Product name shown in the UI (frame title, command help). One source so the
-# agent and UI can't display different names.
 APP_NAME = "Omni"
 
 # Claude-ish terracotta accent.
@@ -77,14 +71,10 @@ _prompt_label = "› "
 _toolbar: Any = _TASK_BAR
 # Set while an ask_* call is waiting for the user to submit.
 _pending: Any = None  # asyncio.Future[str] | None
-# agent.py registers client.interrupt() here so ctrl-c can reach a running task.
+# Registered by agent.py so ctrl-c can reach a running task.
 _interrupt_handler: Callable[[], Awaitable[None]] | None = None
 
 _app: Application[Any] | None = None
-
-# Scrolling is driven by the output window's ``vertical_scroll``: the wheel and
-# Pg keys move it, and ``_emit`` snaps to the bottom on new output only when the
-# view was already there. See ``_cursor_point`` for why the cursor sits on top.
 
 
 def _invalidate() -> None:
@@ -111,13 +101,11 @@ def _emit(renderable: Any) -> None:
     Console(
         file=buf, force_terminal=True, color_system="truecolor", width=_term_width()
     ).print(renderable)
-    # Decide *before* appending whether the user was parked at the bottom; only
-    # then do we ride the new output down (otherwise we'd yank them away from
-    # whatever they scrolled up to read).
+    # Only follow new output down if the user was already at the bottom.
     stick = _at_bottom()
     _blocks.append(to_formatted_text(ANSI(buf.getvalue())))
     if stick:
-        # Overshoot; the render clamps it to the real bottom.
+        # Overshoot; the render clamps it.
         _output_window.vertical_scroll = _content_lines()
     _invalidate()
 
@@ -137,12 +125,8 @@ def _content_lines() -> int:
 
 
 def _cursor_point() -> Point:
-    """Park the invisible cursor on the current top line.
-
-    prompt_toolkit scrolls to keep the cursor visible; pinning it to the top of
-    the viewport means our ``vertical_scroll`` is what wins, so the wheel and Pg
-    keys can move freely instead of snapping back to a fixed cursor line.
-    """
+    """Pin the invisible cursor to the top line so our ``vertical_scroll``
+    wins over prompt_toolkit's keep-cursor-visible scrolling."""
     return Point(x=0, y=min(_output_window.vertical_scroll, _content_lines()))
 
 
@@ -159,8 +143,7 @@ _output_window = Window(
 
 
 def _at_bottom() -> bool:
-    """True when the last content line is currently visible (or nothing rendered
-    yet, so the first output sticks)."""
+    """True when the last content line is visible (or nothing rendered yet)."""
     info = _output_window.render_info
     if info is None:
         return True
@@ -170,7 +153,7 @@ def _at_bottom() -> bool:
 def _accept(buff: Buffer) -> bool:
     if _pending is not None and not _pending.done():
         _pending.set_result(buff.text)
-    return False  # clear the input box; no residue
+    return False  # clear the input box
 
 
 _input_buffer = Buffer(accept_handler=_accept, multiline=False)
@@ -198,22 +181,20 @@ _kb = KeyBindings()
 
 @_kb.add("c-c")
 def _(event: Any) -> None:
-    """Interrupt a running task; harmless when idle at the prompt."""
+    """Interrupt a running task."""
     if _interrupt_handler is not None:
         event.app.create_background_task(_run_interrupt())
 
 
 @_kb.add("c-d")
 def _(event: Any) -> None:
-    """EOF: end whatever ask_* is waiting (the loop reads this as quit/deny)."""
+    """EOF: fail the pending ask_* (read as quit/deny)."""
     if _pending is not None and not _pending.done():
         _pending.set_exception(EOFError())
 
 
 def _visible_span(info: Any) -> int:
-    """Content lines on screen, minus one for continuity overlap. Counting
-    *visible* lines (not window rows) makes a page step account for wrapping, so
-    PgUp/PgDn never skip wrapped content."""
+    """Visible content lines (not window rows), so paging accounts for wrapping."""
     return max(1, info.last_visible_line() - info.first_visible_line())
 
 
@@ -231,8 +212,7 @@ def _(event: Any) -> None:
     info = _output_window.render_info
     if info is None:
         return
-    # Overshoot is clamped on render; landing at the bottom re-arms auto-scroll
-    # via _at_bottom().
+    # Overshoot is clamped on render; hitting bottom re-arms auto-scroll.
     _output_window.vertical_scroll = info.vertical_scroll + _visible_span(info)
     _invalidate()
 
@@ -299,10 +279,7 @@ def _tool_plain(name: str) -> str:
     return name
 
 
-# Canonical relay-connection states. agent.py produces these; the maps below
-# turn each into its dot colour, displayed label, and connect hints. Use the
-# constants everywhere instead of bare strings so the producer and consumer
-# can't drift apart.
+# Canonical relay-connection states (agent.py produces these).
 STATE_CONNECTED = "connected"
 STATE_INTERRUPTED = "interrupted"
 STATE_DISCONNECTED = "disconnected"
@@ -316,7 +293,7 @@ _STATE_STYLES = {
     STATE_NO_RELAY: "red",
 }
 
-# state -> human label shown after "unity relay" (the key itself reads poorly).
+# state -> human label.
 _STATE_LABELS = {
     STATE_CONNECTED: "connected",
     STATE_INTERRUPTED: "interrupted",
@@ -324,7 +301,7 @@ _STATE_LABELS = {
     STATE_NO_RELAY: "no relay found",
 }
 
-# How-to-connect instructions, shown whenever the relay isn't connected.
+# Hints shown whenever the relay isn't connected.
 _STATE_HINTS = {
     STATE_DISCONNECTED: (
         "→ Is the Unity Editor open with the MCP bridge running?",
@@ -379,11 +356,7 @@ def relay_update(state: str) -> None:
 
 
 def user_prompt(text: str) -> None:
-    """Echo submitted input into the scroll pane.
-
-    The input box clears on submit (``_accept`` returns False), so without this
-    the transcript would show only Claude's side.
-    """
+    """Echo submitted input into the scroll pane (the input box clears on submit)."""
     _emit(Text(""))
     line = Text("› ", style=f"bold {ACCENT}")
     line.append(text)
@@ -513,7 +486,7 @@ def turn_done(num_turns: int, cost: float | None, error_msg: str | None) -> None
 
 
 def command_help(items: list[tuple[str, str]]) -> None:
-    """Render the slash-command list (label + description per row)."""
+    """Render the slash-command list."""
     _emit(Text(""))
     _emit(Text("commands", style=f"bold {ACCENT}"))
     for name, desc in items:

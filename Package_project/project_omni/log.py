@@ -1,9 +1,7 @@
 """File-based logging for omni.
 
-File-only on purpose: the full-screen UI owns stdout/stderr, so a
-StreamHandler would corrupt the display. The handler sits on the root
-logger so SDK warnings/errors are captured too; omni's own loggers run
-at INFO for session breadcrumbs around the tracebacks.
+File-only on purpose: the full-screen UI owns stdout/stderr. The handler
+sits on the root logger so SDK warnings/errors are captured too.
 """
 from __future__ import annotations
 
@@ -17,10 +15,7 @@ _FORMAT = "%(asctime)s %(levelname)-8s %(name)s: %(message)s"
 
 
 def setup() -> Path:
-    """Attach the rotating file handler; returns the log file path.
-
-    Call once at process start, before the UI takes the screen.
-    """
+    """Attach the rotating file handler (once, at startup); returns the log path."""
     log_file = config.path().parent / "omni.log"
     log_file.parent.mkdir(parents=True, exist_ok=True)
     handler = RotatingFileHandler(
