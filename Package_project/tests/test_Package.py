@@ -1,13 +1,3 @@
-"""Tests for project_omni.
-
-Scope: the package's pure, deterministic logic — the config store, project /
-relay discovery, status mapping, and the human-in-the-loop approval gate.
-Anything that needs a live Unity Editor, a connected ClaudeSDKClient, or the
-full-screen prompt_toolkit app is intentionally out of scope (those are
-integration concerns, not unit-testable without heavy fakes).
-
-Run:  pytest        (install dev deps first: pip install -e .[dev])
-"""
 import asyncio
 import json
 
@@ -27,13 +17,10 @@ def make_unity(path):
     (path / "Assets").mkdir(parents=True, exist_ok=True)
     return path
 
-
 # config store
 
 @pytest.fixture
 def tmp_config(tmp_path, monkeypatch):
-    """Point the config module at a throwaway directory so tests never touch
-    the real ~/.omni/config.json."""
     cfg_dir = tmp_path / ".omni"
     monkeypatch.setattr(config, "_CONFIG_DIR", cfg_dir)
     monkeypatch.setattr(config, "_CONFIG_FILE", cfg_dir / "config.json")
@@ -70,7 +57,6 @@ def test_load_tolerates_corrupt_json(tmp_config):
     # A corrupt file must degrade to "no config", not raise.
     assert config.get("project") is None
 
-
 # is_unity_project
 
 def test_is_unity_project_detects_csproj(tmp_path):
@@ -96,7 +82,6 @@ def test_is_unity_project_ignores_file_named_assets(tmp_path):
     # Assets must be a directory; a stray file with that name doesn't count.
     (tmp_path / "Assets").write_text("", encoding="utf-8")
     assert not agent.is_unity_project(tmp_path)
-
 
 # find_project: priority order
 
@@ -148,7 +133,6 @@ def test_find_project_walks_up_from_relay_to_project_settings(tmp_path, monkeypa
     relay.write_text("", encoding="utf-8")
     monkeypatch.setenv("UNITY_RELAY_PATH", str(relay))
     assert agent.find_project(None) == root.resolve()
-
 
 # find_relay
 
