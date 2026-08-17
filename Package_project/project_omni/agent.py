@@ -190,8 +190,7 @@ def build_options(
         }
 
     return ClaudeAgentOptions(
-        # preset+append keeps the default system prompt; a plain string would
-        # replace it.
+        # preset+append keeps the default system prompt; a plain string would replace it.
         system_prompt={
             "type": "preset",
             "preset": "claude_code",
