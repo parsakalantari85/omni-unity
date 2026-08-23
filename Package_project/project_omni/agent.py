@@ -38,11 +38,13 @@ def make_approval_gate(roots: Iterable[Path]):
     """Build the can_use_tool callback, closing over the allowed roots."""
     resolved_roots = [Path(r).resolve() for r in roots]
 
-    def _in_roots(raw: Any) -> bool:
+    def _in_roots(raw: Any, base: Any = None) -> bool:
         if not raw:
             return True  # tool defaults to cwd, which is the project root
         try:
-            p = Path(str(raw)).resolve()  # neutralizes ../ and symlink escapes
+            anchor = Path(str(base)) if base else Path.cwd() 
+            p = Path(anchor ,str(raw)).resolve()  # neutralizes ../ and symlink escapes
+            # `raw` absolute discards `anchor`, matching pathlib join semantics
         except (OSError, ValueError):
             return False
         return any(p == r or p.is_relative_to(r) for r in resolved_roots)
@@ -53,6 +55,9 @@ def make_approval_gate(roots: Iterable[Path]):
         """Prompt the user for any tool call not already allowed elsewhere."""
         if tool_name in AUTO_APPROVE_ALWAYS:
             return PermissionResultAllow()
+        if tool_name == "Glob":
+            if _in_roots(input_data.get("pattern"), base=input_data.get("path")):
+                return PermissionResultAllow()
         if tool_name in AUTO_APPROVE_READONLY and _in_roots(
             input_data.get("file_path") or input_data.get("path")
         ):
