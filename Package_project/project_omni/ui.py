@@ -67,7 +67,7 @@ _style = Style.from_dict(
 # Accumulated output: each block is a list of (style, text) fragments.
 _blocks: list[Any] = []
 # Current input prompt label and bottom bar (mutated per ask_*).
-_prompt_label = "› "
+_prompt_label = "❯ "
 _toolbar: Any = _TASK_BAR
 # Set while an ask_* call is waiting for the user to submit.
 _pending: Any = None  # asyncio.Future[str] | None
@@ -358,7 +358,7 @@ def relay_update(state: str) -> None:
 def user_prompt(text: str) -> None:
     """Echo submitted input into the scroll pane (the input box clears on submit)."""
     _emit(Text(""))
-    line = Text("› ", style=f"bold {ACCENT}")
+    line = Text("❯ ", style=f"bold {ACCENT}")
     line.append(text)
     _emit(line)
 
@@ -542,7 +542,7 @@ async def _ask(label: str, toolbar: Any) -> str:
 
 
 async def ask_task() -> str:
-    return await _ask("› ", _TASK_BAR)
+    return await _ask("❯ ", _TASK_BAR)
 
 
 async def ask_choice() -> str:
