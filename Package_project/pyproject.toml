@@ -1,6 +1,6 @@
 [project]
 name = "project-omni"
-version = "1.0.0"
+version = "1.2.0"
 description = "Unity Editor automation agent, built on the Claude Agent SDK"
 authors = [{name = "Parsa", email = "141932922+parsakalantari85@users.noreply.github.com"}]
 requires-python = ">=3.10"
