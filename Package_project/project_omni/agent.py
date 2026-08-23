@@ -309,7 +309,7 @@ async def cmd_model(client: ClaudeSDKClient, relay: str | None, arg: str) -> Non
     """Switch the model mid-session, e.g. `/model claude-opus-4-8`."""
     model = arg.strip()
     if not model:
-        ui.error("Usage: /model <name> (e.g. /model claude-sonnet-4-6).")
+        ui.error("Usage: /model <name> (e.g. /model claude-sonnet-x-x).")
         return
     try:
         await client.set_model(model)
