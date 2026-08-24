@@ -36,7 +36,7 @@ from . import log
 
 _logger = log.get("ui")
 
-APP_NAME = "Omni"
+APP_NAME = "OMNI"
 
 ACCENT = "#57a9d9" # New "Sky Blue" instead of "Terracotta" accent
 PREVIEW_LIMIT = 2000
