@@ -19,7 +19,7 @@ build-backend = "setuptools.build_meta"
 packages = ["project_omni"]
 
 [tool.setuptools.dynamic]
-optional-dependencies = {dev = {file = ["dev-requirements.txt"]}}
+optional-dependencies = {dev = {file = ["dev-requirements.txt"]}} # add packages for development in the dev-requirements.txt file
 
 [project.scripts]
 omni = "project_omni.agent:run"
