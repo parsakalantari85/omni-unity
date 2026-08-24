@@ -39,7 +39,7 @@ _logger = log.get("ui")
 APP_NAME = "Omni"
 
 # Claude-ish terracotta accent.
-ACCENT = "#d97757"
+ACCENT = "#57a9d9"
 PREVIEW_LIMIT = 2000
 
 # Bottom key-hint bars, swapped per input mode.
