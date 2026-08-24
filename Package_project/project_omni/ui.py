@@ -53,7 +53,7 @@ _LINE_BAR = HTML(" <b>enter</b> submit  ·  <b>ctrl-d</b> cancel ")
 
 _style = Style.from_dict(
     {
-        "prompt": "bold #d97757",
+        "prompt": f"bold {ACCENT}", # Matching glyph with the rest of the UI
         "toolbar": "#888888",
         "frame.border": ACCENT,
         "frame.label": f"bold {ACCENT}",
