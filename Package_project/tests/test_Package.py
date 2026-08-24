@@ -15,6 +15,11 @@ from claude_agent_sdk.types import (
 def make_unity(path):
     """Give a directory the minimal shape is_unity_project accepts."""
     (path / "Assets").mkdir(parents=True, exist_ok=True)
+    settings = path / "ProjectSettings"
+    settings.mkdir(parents=True, exist_ok=True)
+    (settings / "ProjectVersion.txt").write_text(
+        "m_EditorVersion: 2022.3.0f1", encoding="utf-8"
+    )
     return path
 
 # config store
@@ -59,19 +64,19 @@ def test_load_tolerates_corrupt_json(tmp_config):
 
 # is_unity_project
 
-def test_is_unity_project_detects_csproj(tmp_path):
+def test_is_unity_project_accepts_full_layout(tmp_path):
+    assert agent.is_unity_project(make_unity(tmp_path))
+
+
+def test_is_unity_project_rejects_bare_csproj(tmp_path):
+    # A C# project is not a Unity project; .csproj alone must not grant access.
     (tmp_path / "Game.csproj").write_text("", encoding="utf-8")
-    assert agent.is_unity_project(tmp_path)
+    assert not agent.is_unity_project(tmp_path)
 
 
-def test_is_unity_project_detects_assembly_csharp(tmp_path):
-    (tmp_path / "Assembly-CSharp.csproj").write_text("", encoding="utf-8")
-    assert agent.is_unity_project(tmp_path)
-
-
-def test_is_unity_project_detects_assets_dir(tmp_path):
+def test_is_unity_project_rejects_assets_without_project_settings(tmp_path):
     (tmp_path / "Assets").mkdir()
-    assert agent.is_unity_project(tmp_path)
+    assert not agent.is_unity_project(tmp_path)
 
 
 def test_is_unity_project_false_for_plain_dir(tmp_path):
@@ -123,11 +128,10 @@ def test_find_project_ignores_nonexistent_paths(monkeypatch):
     assert agent.find_project("/no/such/dir/anywhere") is None
 
 
-def test_find_project_walks_up_from_relay_to_project_settings(tmp_path, monkeypatch):
+def test_find_project_walks_up_from_relay_to_project_root(tmp_path, monkeypatch):
     monkeypatch.delenv("UNITY_PROJECT_PATH", raising=False)
     monkeypatch.setattr(config, "get", lambda *a, **k: None)
-    root = tmp_path / "UnityProj"
-    (root / "ProjectSettings").mkdir(parents=True)
+    root = make_unity(tmp_path / "UnityProj")
     relay = root / "RelayApp~" / "relay.exe"
     relay.parent.mkdir(parents=True)
     relay.write_text("", encoding="utf-8")

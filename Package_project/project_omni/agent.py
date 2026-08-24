@@ -33,6 +33,8 @@ logger = log.get()
 AUTO_APPROVE_READONLY = {"Read", "Glob", "Grep"}
 AUTO_APPROVE_ALWAYS = {"TodoWrite"}
 
+UNITY_MARKERS = "Assets/ and ProjectSettings/ProjectVersion.txt"
+
 
 def make_approval_gate(roots: Iterable[Path]):
     """Build the can_use_tool callback, closing over the allowed roots."""
@@ -132,7 +134,7 @@ def find_project(override: str | None = None) -> Path | None:
     if relay_env:
         candidate = Path(relay_env)
         for p in [candidate, *candidate.parents]:
-            if (p / "ProjectSettings").is_dir():
+            if is_unity_project(p):
                 return p.resolve()
 
     return None
@@ -141,8 +143,7 @@ def find_project(override: str | None = None) -> Path | None:
 def is_unity_project(path: Path) -> bool:
     return (
         (path / "Assets").is_dir()
-        or any(path.glob("*.csproj"))
-        or any(path.glob("Assembly-CSharp*"))
+        and (path / "ProjectSettings" / "ProjectVersion.txt").is_file()
     )
 
 
@@ -444,7 +445,7 @@ async def prompt_unity_access() -> Path | None:
     if not is_unity_project(cwd):
         ui.error("omni only runs inside a Unity project.")
         ui.note(f"  {cwd}")
-        ui.note("  (no Assets/, .csproj, or Assembly-CSharp found here)")
+        ui.note(f"  (needs {UNITY_MARKERS})")
         return None
 
     ui.note("Grant omni persistent access to this Unity project?")
@@ -575,7 +576,7 @@ def run() -> None:
             print(f"error: '{p}' is not a directory")
             sys.exit(1)
         if not is_unity_project(p):
-            print(f"error: '{p}' is not a Unity project (no Assets/, .csproj, or Assembly-CSharp)")
+            print(f"error: '{p}' is not a Unity project (needs {UNITY_MARKERS})")
             sys.exit(1)
         config.set("project", str(p))
         print(f"Saved project root: {p}  ({config.path()})")
@@ -588,16 +589,21 @@ def run() -> None:
             print(f"error: --project '{args.project}' is not a directory")
             sys.exit(1)
         if not is_unity_project(p):
-            print(f"error: '{p}' is not a Unity project (no Assets/, .csproj, or Assembly-CSharp)")
+            print(f"error: '{p}' is not a Unity project (needs {UNITY_MARKERS})")
             sys.exit(1)
 
     add_dirs: list[str | Path] = []
     for raw in args.add_dir or []:
         p = Path(raw)
-        if p.is_dir():
-            add_dirs.append(p.resolve())
-        else:
+        if not p.is_dir():
             print(f"warning: --add-dir '{raw}' is not a directory; ignoring")
+            continue
+        resolved = p.resolve()
+        if resolved.parent == resolved or resolved == Path.home():
+            print(f"error: --add-dir '{resolved}' is too broad (drive root or home)")
+            sys.exit(1)
+        add_dirs.append(resolved)
+
 
     log_file = log.setup()
     project = find_project(args.project)
