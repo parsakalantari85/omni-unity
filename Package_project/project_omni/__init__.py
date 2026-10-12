@@ -1,1 +1,1 @@
-"""Unity Editor automation agent — interactive CLI with approval gating."""
+"""Omni — a general-purpose automation agent CLI."""

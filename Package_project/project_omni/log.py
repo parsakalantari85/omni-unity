@@ -1,8 +1,3 @@
-"""logging.
-
-File-only on purpose: the full-screen UI owns stdout/stderr. The handler
-sits on the root logger so SDK warnings/errors are captured too.
-"""
 from __future__ import annotations
 
 import logging

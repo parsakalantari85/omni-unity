@@ -1,140 +1,146 @@
-# Omni — Unity Editor Automation Agent
+<div align="center">
+
+# Omni
+
+### Your terminal, your friend.
+
+**Intelligence, in your terminal.**
+
 [![CI](https://github.com/parsakalantari85/omni-unity/actions/workflows/ci.yml/badge.svg)](https://github.com/parsakalantari85/omni-unity/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Claude Agent SDK](https://img.shields.io/badge/built%20on-Claude%20Agent%20SDK-D97757)](https://github.com/anthropics/claude-agent-sdk-python)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-> [!WARNING]
-> This project is temporarily in maintenance mode.
+[Quick start](#quick-start) · [Features](#features) · [Commands](#commands) · [FAQ](#faq)
 
-Omni is an interactive CLI that lets you automate Unity Editor workflows in plain English. It pairs the [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk-python) with the Unity MCP relay to give Claude live read/write access to your Unity project, while an explicit approval gate keeps you in control of every action.
+<code>pip install -e ./Package_project</code>
 
-![Omni terminal UI running a task](./img/Screenshot%202026-06-23%20125057.png)
+<br><br>
 
-## How it works
+<img src="./img/Screenshot%202026-06-23%20125057.png" alt="Omni running a task in the terminal" width="1200">
 
-Like any agent, Omni works in a loop. Here's a Unity example:
-1. You type a task (e.g. "Enable HDR on the Main Camera and set bloom intensity to 0.8").
-2. Claude plans the steps and issues tool calls.
-3. Read-only tools (`Read`, `Glob`, `Grep`) are approved automatically.
-4. Everything else pauses for your approval — you can approve, deny, edit the payload, or stop the task entirely.
-5. The relay translates approved calls into Unity Editor actions and returns results.
+</div>
 
-## Requirements
+---
 
-- Python ≥ 3.10
-- Claude Code (CLI or Desktop)
-- Unity Editor with the [Unity MCP bridge](https://docs.unity3d.com/Packages/com.unity.ai.assistant@2.0/manual/unity-mcp-overview.html) installed and approved in **Project Settings ▸ AI ▸ Unity MCP**
-- The Unity MCP relay binary (`relay_linux`, `relay_mac_arm64`, `relay_mac_x64`, or `relay_win.exe`)
+Omni runs Claude inside a directory you choose. Describe what you want done, and it plans, reads, edits and runs commands to get there.
 
-## Installation
+Reads inside your workspace happen on their own. Everything else waits for you.
+
+## Quick start
+
+### 1. Install
+
+```bash
+git clone https://github.com/parsakalantari85/omni-unity.git
+cd omni-unity/Package_project
+pip install -e .
+```
+
+You need Python 3.10+ and Claude credentials: an `ANTHROPIC_API_KEY`, or an existing Claude Code sign-in.
+
+### 2. Launch
+
+```bash
+omni --project ~/dev/my-app
+```
+
+### 3. Give it a task
+
+```text
+Rename the utils module to helpers and fix every import.
+```
+
+## How Omni works
+
+Claude works through the task one tool call at a time, and the approval gate decides which calls need you.
+
+```mermaid
+flowchart LR
+    A[Your task] --> B[Claude calls a tool]
+    B --> C{Read inside<br/>the workspace?}
+    C -- yes --> D[Runs]
+    C -- no --> E[You decide<br/>a · d · e · f · q]
+    E -- approve --> D
+    E -- deny --> B
+    D --> B
+```
+
+## Features
+
+| Feature | What you get | Try it |
+|---|---|---|
+| **Approval gate** | Approve, deny with a reason, edit the input, inspect the full payload, or stop the task | Any write or command |
+| **Safe reads** | `Read`, `Glob` and `Grep` run without a prompt, but only inside your workspace | Ask a question about the code |
+| **Workspaces** | Save a project and its extra directories under a name, then switch in one command | `/workspace save app`, `omni -w app` |
+| **Extra directories** | Grant access beyond the working directory | `--add-dir ../shared-lib` |
+| **Folder trust** | Asked once per folder, before its settings can start servers or hooks | First launch in a new folder |
+| **MCP servers** | Bring your own servers, or reuse the ones already set up for Claude Code | `OMNI_MCP_SERVERS`, `/tools` |
+| **Rewind** | Put files back the way they were at your last message | `/rewind` |
+| **Model switching** | Change the model without restarting | `/model <name>` |
+| **Permission modes** | Plan first, auto-accept edits, and more | `/mode plan` |
+| **Interrupt** | Stop a running task immediately | `ctrl-c` |
+| **Rich transcript** | Markdown answers, colored diffs, syntax-highlighted previews | Built in |
+| **Cost per task** | Turns and cost reported when each task finishes | Built in |
+
+## Commands
+
+| Command | Does |
+|---|---|
+| `/workspace [open \| save \| remove]` | List, switch, save or forget workspaces |
+| `/tools [name]` | List the tools an MCP server exposes |
+| `/test` | Check MCP server status |
+| `/reconnect [name]` | Reconnect an MCP server (alias: `/restart`) |
+| `/model <name>` | Switch the model |
+| `/mode <mode>` | Change the permission mode |
+| `/rewind` | Restore files to your last message |
+| `/clear` | Clear the transcript pane |
+| `/exit`, `/quit` | Leave Omni |
+
+Press `?` on an empty prompt to see them all.
+
+## FAQ
+
+<details>
+<summary><b>Which model does Omni use?</b></summary>
+<br>
+The Agent SDK's default, until you pick another with <code>/model &lt;name&gt;</code>.
+</details>
+
+<details>
+<summary><b>Does my code leave my machine?</b></summary>
+<br>
+Omni runs locally, but anything Claude reads becomes part of the conversation sent to Anthropic's API, just as it does with Claude Code.
+</details>
+
+<details>
+<summary><b>Can it run without asking me?</b></summary>
+<br>
+Yes. <code>/mode acceptEdits</code> auto-accepts file edits, and <code>/mode bypassPermissions</code> or <code>/mode auto</code> turn the gate off once you confirm.
+</details>
+
+<details>
+<summary><b>Does it use my Claude Code setup?</b></summary>
+<br>
+Yes, it shares your Claude Code MCP servers and settings files. Set <code>"setting_sources": []</code> in <code>~/.omni/config.json</code> to keep sessions isolated.
+</details>
+
+<details>
+<summary><b>Where are settings and logs kept?</b></summary>
+<br>
+Settings are in <code>~/.omni/config.json</code> and the log is at <code>~/.omni/omni.log</code>. Set <code>OMNI_DEBUG=1</code> to see full tracebacks.
+</details>
+
+## Contributing
+
+Issues and pull requests are welcome. To run the tests:
 
 ```bash
 cd Package_project
-pip install -e .          # installs the `omni` console script
-# pytest installation guide at the very end of this README.
-```
-
-## Configuration
-
-### Relay binary
-
-Point Omni at the relay binary (or the directory that contains platform binaries):
-
-```bash
-export UNITY_RELAY_PATH=/path/to/RelayApp~               # directory form
-```
-or
-```bash
-export UNITY_RELAY_PATH=/path/to/RelayApp~/relay_linux   # file form
-```
-
-Omni picks the right binary for the current OS automatically when you point it at a directory.
-
-### Unity project
-
-Omni finds your project in priority order:
-
-| Priority | Source |
-|---|---|
-| 1 | `--project DIR` CLI flag |
-| 2 | Saved config (`~/.omni/config.json`) via `--set-project` |
-| 3 | `UNITY_PROJECT_PATH` environment variable |
-| 4 | Walk up from `UNITY_RELAY_PATH` until a `ProjectSettings/` folder is found |
-
-Save a project permanently so you don't need to pass `--project` every time:
-
-```bash
-omni --set-project /path/to/MyGame
-```
-
-## Usage
-
-```
-omni [--project DIR] [--set-project DIR] [--add-dir DIR]
-```
-
-| Flag | Description |
-|---|---|
-| `--project DIR` | Use this Unity project for the session (does not save). |
-| `--set-project DIR` | Save a project root to `~/.omni/config.json` and exit. |
-| `--add-dir DIR` | Grant the agent access to an extra directory. Repeatable. |
-
-### Example
-
-```bash
-# Point at the relay, then start the agent inside your Unity project
-export UNITY_RELAY_PATH=~/Downloads/RelayApp~
-omni --project ~/dev/MyGame
-```
-
-## Slash commands
-
-Type any of these at the `›` prompt:
-
-| Command | Description |
-|---|---|
-| `/help` | List all commands |
-| `/test` | Probe the Unity MCP connection |
-| `/tools` | List the tools the Unity relay currently exposes |
-| `/model <name>` | Switch the Claude model mid-session (e.g. `/model claude-opus-4-8`) |
-| `/mode <mode>` | Change permission mode (`default` / `acceptEdits` / `plan` / …) |
-| `/reconnect` | Reconnect the relay after an Editor restart |
-| `/restart` | Alias for `/reconnect` |
-| `/clear` | Clear the transcript pane (conversation is preserved) |
-| `/exit`, `/quit` | Leave Omni |
-
-## Approval gate
-
-Whenever Claude wants to call a non-read-only tool, Omni shows a preview and waits:
-
-| Key | Action |
-|---|---|
-| `a` | **Approve** — let the tool run |
-| `d` | **Deny** — block this call (you can give a reason) |
-| `e` | **Edit** — paste replacement JSON to change the tool's input before it runs |
-| `f` | **Full payload** — show the complete input before deciding |
-| `q` | **Deny + stop** — block this call and interrupt the whole task |
-
-Read-only tools (`Read`, `Glob`, `Grep`, `TodoWrite`) are approved silently without a prompt.
-
-## Debugging
-
-Set `OMNI_DEBUG=1` to print a full Python traceback on fatal errors instead of the terse one-liner:
-
-```bash
-OMNI_DEBUG=1 omni --project ~/dev/MyGame
-```
-
-## Running tests
-
-From the same Package_project folder, run:
-
-```bash
 pip install -e .[dev]
 pytest
 ```
 
-Tests cover the config store, project/relay discovery, relay-state mapping, UI name parsing, and the full approval-gate state machine. Live Unity Editor integration is out of scope for unit tests.
-
-
 ## License
 
-See [LICENSE](LICENSE).
+[MIT](LICENSE)
