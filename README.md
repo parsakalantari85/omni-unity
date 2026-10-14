@@ -2,10 +2,6 @@
 
 # Omni
 
-### Your terminal, your friend.
-
-**Intelligence, in your terminal.**
-
 [![CI](https://github.com/parsakalantari85/omni-unity/actions/workflows/ci.yml/badge.svg)](https://github.com/parsakalantari85/omni-unity/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Claude Agent SDK](https://img.shields.io/badge/built%20on-Claude%20Agent%20SDK-D97757)](https://github.com/anthropics/claude-agent-sdk-python)
